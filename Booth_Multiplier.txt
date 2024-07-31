@@ -1,0 +1,84 @@
+`timescale 1ns / 1ps
+//////////////////////////////////////////////////////////////////////////////////
+// Company: 
+// Engineer: 
+// 
+// Create Date: 01/09/2023 07:25:19 PM
+// Design Name: 
+// Module Name: Booth_Multiplier
+// Project Name: 
+// Target Devices: 
+// Tool Versions: 
+// Description: 
+// 
+// Dependencies: 
+// 
+// Revision:
+// Revision 0.01 - File Created
+// Additional Comments:
+// 
+//////////////////////////////////////////////////////////////////////////////////
+//module definition of the booth multiplier
+module Booth_Multiplier(clock_sig,reset,in_pulse,Multiplier,Multiplicand,vpulse,FinalValue);
+    input clock_sig, reset,in_pulse;    
+    input signed [3:0] Multiplier;    // inputs are signed numbers (carried Multiplier)
+    input signed [3:0]Multiplicand;   // inputs are signed numbers (carried Multiplicand)
+    output signed [7:0]FinalValue;   //outputs are signed numbers. (carried product)
+    output vpulse;// all input and output wired type.
+    //storing tempory values
+    reg signed [7:0]FinalValue, Fvalue1,Fvalue_temp; // carried final and temporary product values
+    reg level1,current_level;   // carried current and next state
+    reg [1:0] var, var_temp;    // carried two bits value for Q0 and Q-1
+    reg [1:0] count, count_temp;    // carried number of bits in Multiplicand
+    reg vpulse, vpulse_temp; 
+    
+    parameter tempory =1'b0, initiate =1'b1;
+    //positive edge for clock signal and negative edge for reset begin   
+    always@ (posedge clock_sig or negedge reset) begin
+    if (!reset)  begin  // when reset value is zero, initilaizing all the value to zero
+        FinalValue<=8'd0;
+        vpulse<=1'b0;
+        current_level<=1'b0;
+        var<=2'd0;
+        count<=2'd0;
+    end 
+    else    // if the reset value one following values will assign
+    begin 
+        FinalValue<=Fvalue1;     // progressing product value will assign to the final value variable
+        vpulse<=vpulse_temp;    
+        current_level<=level1;  //state will be update
+        var<=var_temp;  // next two bits value of Q0 and Q-1 will update
+        count<=count_temp;  //count will be update
+    end    end
+    
+    always@ (*) //if any of values inside changed, corresponding case will execute
+    begin
+    case (current_level)    //if current level is zero the tempory will execute
+    tempory:
+    begin
+        count_temp=2'b0;    //initialize tempory count
+        vpulse_temp=1'b0;   // initialize tempory vpulse 
+    if(in_pulse)   begin    // if initialize pulse is one 
+        level1=initiate;
+        var_temp={Multiplier[0],1'b0};    // concatinate Multiplier Q0 and Q-1 bits (11,00,01,10)
+        Fvalue1={4'd0,Multiplier};    // in initializeing accumilator and Multiplier values set to zero
+    end  else 
+    begin
+        level1=current_level;
+        var_temp=2'd0;
+        Fvalue1=8'd0;
+    end    end
+    initiate: 
+        begin
+            case(var)
+            2'b10 : Fvalue_temp={FinalValue[7:4]-Multiplicand,FinalValue[3:0]};     //for 10 bits sequence
+            2'b01 : Fvalue_temp={FinalValue[7:4]+Multiplicand,FinalValue[3:0]};     // for 01 bits sequence
+            default: Fvalue_temp={FinalValue[7:4],FinalValue[3:0]};      // for 00 and 11 bits seuence
+        endcase
+             var_temp={Multiplier[count+1],Multiplier[count]};  //concatinate Q0 and Q-1 values 
+             count_temp=count+1'b1;
+             Fvalue1=Fvalue_temp>>>1;   //arithmatic shift right operation
+             vpulse_temp=(&count)? 1'b1:1'b0;
+             level1=(&count)?tempory:current_level;
+         end  endcase    end
+endmodule
